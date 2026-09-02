@@ -1,62 +1,26 @@
 import type { Transcript } from "@/features/transcription/hooks/useAudioDetail";
 
-const formatSRTTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    const milliseconds = Math.floor((seconds % 1) * 1000);
-
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")},${milliseconds.toString().padStart(3, "0")}`;
-};
-
-const formatTimestamp = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-};
-
-const getDisplaySpeakerName = (originalSpeaker: string, mappings: Record<string, string> = {}) => {
-    return mappings[originalSpeaker] || originalSpeaker;
-};
-
-export function buildTXTContent(
-    transcript: Transcript,
-    speakerMappings: Record<string, string> = {},
-    options?: { includeTimestamps?: boolean; includeSpeakerLabels?: boolean }
-): string {
-    if (!transcript) return "";
-
-    if (!options?.includeSpeakerLabels && !options?.includeTimestamps) {
-        return transcript.text || "";
-    }
-
-    if (transcript.segments && transcript.segments.length > 0) {
-        let content = "";
-        transcript.segments.forEach((segment, index) => {
-            if (index > 0) content += "\n\n";
-
-            if (options?.includeTimestamps) {
-                content += `[${formatTimestamp(segment.start)}] `;
-            }
-
-            if (options?.includeSpeakerLabels && segment.speaker) {
-                content += `${getDisplaySpeakerName(segment.speaker, speakerMappings)}: `;
-            }
-
-            content += segment.text.trim();
-        });
-        return content;
-    }
-
-    return transcript.text || "";
-}
-
 export function useTranscriptDownload() {
+
+    const formatSRTTime = (seconds: number): string => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        const milliseconds = Math.floor((seconds % 1) * 1000);
+
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${milliseconds.toString().padStart(3, '0')}`;
+    };
+
+    const formatTimestamp = (seconds: number): string => {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+    };
 
     const downloadFile = (content: string, filename: string, contentType: string) => {
         const blob = new Blob([content], { type: contentType });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
+        const link = document.createElement('a');
         link.href = url;
         link.download = filename;
         document.body.appendChild(link);
@@ -65,10 +29,14 @@ export function useTranscriptDownload() {
         URL.revokeObjectURL(url);
     };
 
+    const getDisplaySpeakerName = (originalSpeaker: string, mappings: Record<string, string>) => {
+        return mappings[originalSpeaker] || originalSpeaker;
+    };
+
     const downloadSRT = (transcript: Transcript, filenameBase: string, speakerMappings: Record<string, string>) => {
         if (!transcript) return;
 
-        let srtContent = "";
+        let srtContent = '';
         let counter = 1;
 
         if (transcript.segments) {
@@ -88,7 +56,7 @@ export function useTranscriptDownload() {
             srtContent = `1\n00:00:00,000 --> 99:59:59,999\n${transcript.text}\n\n`;
         }
 
-        downloadFile(srtContent, `${filenameBase}.srt`, "text/plain");
+        downloadFile(srtContent, `${filenameBase}.srt`, 'text/plain');
     };
 
     const downloadTXT = (
@@ -99,9 +67,29 @@ export function useTranscriptDownload() {
     ) => {
         if (!transcript) return;
 
-        const content = buildTXTContent(transcript, speakerMappings, options);
+        let content = '';
 
-        downloadFile(content, `${filenameBase}.txt`, "text/plain");
+        if (!options.includeSpeakerLabels && !options.includeTimestamps) {
+            content = transcript.text;
+        } else if (transcript.segments) {
+            transcript.segments.forEach((segment, index) => {
+                if (index > 0) content += '\n\n';
+
+                if (options.includeTimestamps) {
+                    content += `[${formatTimestamp(segment.start)}] `;
+                }
+
+                if (options.includeSpeakerLabels && segment.speaker) {
+                    content += `${getDisplaySpeakerName(segment.speaker, speakerMappings)}: `;
+                }
+
+                content += segment.text.trim();
+            });
+        } else {
+            content = transcript.text;
+        }
+
+        downloadFile(content, `${filenameBase}.txt`, 'text/plain');
     };
 
     const downloadJSON = (
@@ -118,12 +106,12 @@ export function useTranscriptDownload() {
         if (!options.includeSpeakerLabels && !options.includeTimestamps) {
             jsonData = {
                 text: transcript.text,
-                format: "simple"
+                format: 'simple'
             };
         } else if (transcript.segments) {
             jsonData = {
                 text: transcript.text,
-                format: "segmented",
+                format: 'segmented',
                 segments: transcript.segments.map(segment => {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const segmentData: any = {
@@ -146,46 +134,12 @@ export function useTranscriptDownload() {
         } else {
             jsonData = {
                 text: transcript.text,
-                format: "simple"
+                format: 'simple'
             };
         }
 
-        downloadFile(JSON.stringify(jsonData, null, 2), `${filenameBase}.json`, "application/json");
+        downloadFile(JSON.stringify(jsonData, null, 2), `${filenameBase}.json`, 'application/json');
     };
 
-    const copyText = async (
-        transcript: Transcript,
-        speakerMappings: Record<string, string> = {},
-        options?: { includeTimestamps?: boolean; includeSpeakerLabels?: boolean }
-    ): Promise<boolean> => {
-        if (!transcript) return false;
-
-        const content = buildTXTContent(transcript, speakerMappings, options);
-
-        try {
-            if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-                await navigator.clipboard.writeText(content);
-                return true;
-            }
-            throw new Error("Clipboard API unavailable");
-        } catch {
-            try {
-                const textarea = document.createElement("textarea");
-                textarea.value = content;
-                textarea.style.position = "fixed";
-                textarea.style.left = "-9999px";
-                textarea.style.top = "-9999px";
-                textarea.setAttribute("readonly", "");
-                document.body.appendChild(textarea);
-                textarea.select();
-                const successful = document.execCommand("copy");
-                document.body.removeChild(textarea);
-                return successful;
-            } catch {
-                return false;
-            }
-        }
-    };
-
-    return { downloadSRT, downloadTXT, downloadJSON, copyText };
+    return { downloadSRT, downloadTXT, downloadJSON };
 }
